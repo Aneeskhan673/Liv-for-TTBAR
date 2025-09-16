@@ -60,18 +60,14 @@ void PrintFourVector(const TLorentzVector&, const char* name = "Vector");
 // Helper function: Contract matrix c_{mu nu} with two vectors: c^{mu nu} * a_mu * b_nu
 double Contract(const TMatrixD& cMatrix, const TLorentzVector& a, const TLorentzVector& b) {
     double result = 0.0;
-    // Define the metric tensor signature: g_{\mu\nu} = diag(1, -1, -1, -1)
-    // Therefore, a_{\mu} = g_{\mu\alpha} a^{\alpha}
-    double g[4] = {1.0, -1.0, -1.0, -1.0}; // Factors to lower the indices: a_\mu = g[\mu] * a^\mu
-
     for (int mu = 0; mu < 4; ++mu) {
         for (int nu = 0; nu < 4; ++nu) {
-            // Correct contraction: c^{\mu\nu} * a_\mu * b_\nu = c^{\mu\nu} * (g[\mu] * a^\mu) * (g[\nu] * b^\nu)
-            result += cMatrix(mu, nu) * (g[mu] * a[mu]) * (g[nu] * b[nu]);
+            result += cMatrix(mu, nu) * a[mu] * b[nu];
         }
     }
     return result;
 }
+
 // Debugging helper
 void PrintFourVector(const TLorentzVector& v, const char* name) {
     std::cout << name << ": (E=" << v.E() << ", px=" << v.Px() << ", py=" << v.Py() << ", pz=" << v.Pz() << ")" << std::endl;
@@ -255,45 +251,36 @@ double computeLIVWeight(const TLorentzVector& p1, const TLorentzVector& p2,
 }
 
 // Coordinate transformation functions
-
 TMatrixD computeRotationMatrix(double siderealTime, double chi) {
-    // Create a 3x3 rotation matrix R^{jJ} for spatial coordinates
-    TMatrixD R(3, 3);
-
-    double phase = siderealTime; // Earth's rotation angle (radians)
-    double cosPhase = cos(phase);
-    double sinPhase = sin(phase);
-    double cosChi = cos(chi);
-    double sinChi = sin(chi);
-
-    // Define the rotation matrix elements (Eq. 10)
-    R(0, 0) = cosChi * cosPhase;  // R^{xX}
-    R(0, 1) = cosChi * sinPhase;  // R^{xY}
-    R(0, 2) = -sinChi;            // R^{xZ}
-
-    R(1, 0) = -sinPhase;          // R^{yX}
-    R(1, 1) = cosPhase;           // R^{yY}
-    R(1, 2) = 0.0;                // R^{yZ}
-
-    R(2, 0) = sinChi * cosPhase;  // R^{zX}
-    R(2, 1) = sinChi * sinPhase;  // R^{zY}
-    R(2, 2) = cosChi;             // R^{zZ}
-
+    TMatrixD R(4, 4);
+    R.Zero();
+    
+    double phase = siderealTime;
+    R(0, 0) = cos(chi) * cos(phase);
+    R(0, 1) = cos(chi) * sin(phase);
+    R(0, 2) = -sin(chi);
+    R(1, 0) = -sin(phase);
+    R(1, 1) = cos(phase);
+    R(1, 2) = 0.0;
+    R(2, 0) = sin(chi) * cos(phase);
+    R(2, 1) = sin(chi) * sin(phase);
+    R(2, 2) = cos(chi);
+    R(3, 3) = 1.0;  // Time component
+    
     return R;
 }
+
 TMatrixD rotateCmuNu(const TMatrixD& cSun, const TMatrixD& R) {
-    // cSun and R are now both 3x3 matrices
-    if (cSun.GetNrows() != 3 || cSun.GetNcols() != 3 ||
-        R.GetNrows() != 3 || R.GetNcols() != 3) {
-        std::cerr << "Error: Matrices must be 3x3 for spatial rotation" << std::endl;
-        return TMatrixD(3, 3);
+    if (cSun.GetNrows() != 4 || cSun.GetNcols() != 4 || 
+        R.GetNrows() != 4 || R.GetNcols() != 4) {
+        std::cerr << "Error: Matrices must be 4x4" << std::endl;
+        return TMatrixD(4,4);
     }
 
-    // Calculate the Lab frame coefficients: c_lab = R * c_sun * R^T
-    TMatrixD RT(TMatrixD::kTransposed, R); // Create R^T
-    TMatrixD cLab(3, 3);
+    TMatrixD RT(R);
+    RT.Transpose(R);
+    TMatrixD cLab(4, 4);
     cLab = R * cSun * RT;
-
     return cLab;
 }
 
@@ -318,16 +305,16 @@ void CombinedSMEAnalysis() {
     }
 
     // 4.2 Configure SME parameters
-TMatrixD cMatrixSun(3, 3); // NOW A 3x3 MATRIX for c_{JK}
-cMatrixSun.Zero();
-// Set a non-zero coefficient for testing. Use only spatial indices.
-// Example: Set c_{XX} = -0.05, c_{YY} = 0.05 to keep it traceless.
-cMatrixSun(0, 0) = 0.1; // c_{XX}
-cMatrixSun(1, 1) = -0.1;  // c_{YY}
-// c_{ZZ} is automatically 0.0, making the matrix traceless (c_XX + c_YY + c_ZZ = 0)
-
-std::cout << "Spatial cMatrixSun (Sun-centered frame) set to:" << std::endl;
-cMatrixSun.Print();
+    TMatrixD cMatrixSun(4, 4);
+    cMatrixSun.Zero();
+    // Set a non-zero coefficient for testing
+    cMatrixSun(0, 0) = -0.1;  // Example LIV coefficient c_{TT}
+    cMatrixSun(1, 1) = 0.1; // To Keep it traceless i use -
+    //cMatrixSun(2, 2) = 0.0;
+    //cMatrixSun(3, 3) = 0.0; //c_{TT}
+    
+    std::cout << "cMatrixSun set to:" << std::endl;
+    cMatrixSun.Print();
     
     
     // 4.3 Process events
@@ -358,35 +345,23 @@ cMatrixSun.Print();
             else if (!p2) p2 = new TLorentzVector(p->Px, p->Py, p->Pz, p->E);
         }
 
-if (top && antitop && p1 && p2) {
-    // Coordinate transformation
-    siderealTime = 2 * M_PI * randGen.Rndm();
-    TMatrixD R = computeRotationMatrix(siderealTime, chi); // Get 3x3 rotation matrix
-    TMatrixD cLab_Spatial = rotateCmuNu(cMatrixSun, R);    // Get 3x3 lab-frame coefficients
+        if (top && antitop && p1 && p2) {
+            // Coordinate transformation
+            siderealTime = 2 * M_PI * randGen.Rndm();
+            TMatrixD R = computeRotationMatrix(siderealTime, chi);
+            TMatrixD cLab = rotateCmuNu(cMatrixSun, R);
 
-    // Build a 4x4 matrix for the existing Contract function.
-    // The time-time and time-space components are unphysical (set to zero).
-    // Only the spatial-spatial part (indices 1,2,3) is filled from cLab_Spatial.
-    TMatrixD cMatrixLab(4, 4);
-    cMatrixLab.Zero(); // Sets all elements to 0, including time components.
+            // Build lab-frame coefficient matrix
+            TMatrixD cMatrixLab(4, 4);
+            cMatrixLab.Zero();
+            for (int mu = 0; mu < 4; ++mu) {
+                for (int nu = 0; nu < 4; ++nu) {
+                    cMatrixLab(mu, nu) = cLab(mu, nu);
+                }
+            }
 
-    // Fill the spatial-spatial block of the 4x4 matrix from the 3x3 cLab_Spatial
-    for (int j = 0; j < 3; ++j) {
-        for (int k = 0; k < 3; ++k) {
-            // Map spatial indices: 0->1 (x), 1->2 (y), 2->3 (z)
-            cMatrixLab(j+1, k+1) = cLab_Spatial(j, k);
-        }
-    }
-    // Now cMatrixLab is a 4x4 matrix with the structure:
-    // [ 0     0       0       0    ]
-    // [ 0   c_xx    c_xy    c_xz   ]
-    // [ 0   c_yx    c_yy    c_yz   ]
-    // [ 0   c_zx    c_zy    c_zz   ]
-
-    // Calculate LIV weight using the 4x4 matrix (with time components zero)
-    eventWeight = computeLIVWeight(*p1, *p2, *top, *antitop, cMatrixLab);
- 
-
+            // Calculate LIV weight
+            eventWeight = computeLIVWeight(*p1, *p2, *top, *antitop, cMatrixLab);
 
             if (i < 3) {  // Debug print for first 3 events
                 double s, t, u;
