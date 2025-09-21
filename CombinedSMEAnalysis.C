@@ -308,8 +308,8 @@ void CombinedSMEAnalysis() {
     TMatrixD cMatrixSun(4, 4);
     cMatrixSun.Zero();
  // Set a non-zero coefficient for testing
-    cMatrixSun(0, 0) = -0.1;   
-    cMatrixSun(1, 1) = 0.1; 
+    cMatrixSun(0, 0) = 0.1;   
+    cMatrixSun(1, 1) = -0.1; 
         
     std::cout << "cMatrixSun set to:" << std::endl;
     cMatrixSun.Print();
