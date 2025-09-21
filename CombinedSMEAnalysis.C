@@ -68,10 +68,6 @@ double Contract(const TMatrixD& cMatrix, const TLorentzVector& a, const TLorentz
     return result;
 }
 
-// Debugging helper
-void PrintFourVector(const TLorentzVector& v, const char* name) {
-    std::cout << name << ": (E=" << v.E() << ", px=" << v.Px() << ", py=" << v.Py() << ", pz=" << v.Pz() << ")" << std::endl;
-}
 
 // Calculate Mandelstam variables s, t, u
 void calculateMandelstam(const TLorentzVector& p1, const TLorentzVector& p2,
