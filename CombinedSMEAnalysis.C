@@ -307,12 +307,10 @@ void CombinedSMEAnalysis() {
     // 4.2 Configure SME parameters
     TMatrixD cMatrixSun(4, 4);
     cMatrixSun.Zero();
-    // Set a non-zero coefficient for testing
-    cMatrixSun(0, 0) = -0.1;  // Example LIV coefficient c_{TT}
-    cMatrixSun(1, 1) = 0.1; // To Keep it traceless i use -
-    //cMatrixSun(2, 2) = 0.0;
-    //cMatrixSun(3, 3) = 0.0; //c_{TT}
-    
+ // Set a non-zero coefficient for testing
+    cMatrixSun(0, 0) = -0.1;   
+    cMatrixSun(1, 1) = 0.1; 
+        
     std::cout << "cMatrixSun set to:" << std::endl;
     cMatrixSun.Print();
     
